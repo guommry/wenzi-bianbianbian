@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>组合文字生成器</title>
+<style>
+  :root { color-scheme: dark; --bg:#0f1115; --panel:#181c22; --border:#2a3038; --text:#e8eaed; --muted:#9aa4b2; --accent:#7c5cff; --accent2:#00d4ff; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans SC", sans-serif; background: var(--bg); color: var(--text); line-height:1.5; }
+  .wrap { max-width: 1600px; margin: 0 auto; padding: 24px 20px 60px; }
+  h1 { font-size: 1.6rem; margin: 0 0 8px; }
+  .sub { color: var(--muted); margin-bottom: 20px; font-size: .95rem; }
+
+  .grid { display: grid; grid-template-columns: 1fr 1.6fr; gap: 16px; align-items: start; }
+  @media (max-width: 1000px) { .grid { grid-template-columns: 1fr; } }
+
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 16px; }
+  label { display: block; font-size: .9rem; color: var(--muted); margin: 10px 0 4px; }
+  textarea, select { width: 100%; background: #0b0d11; color: var(--text); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; font: inherit; outline: none; }
+  textarea { min-height: 120px; resize: vertical; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .row > * { flex: 1; min-width: 120px; }
+  .btn { appearance: none; border: 1px solid var(--border); background: #20252d; color: var(--text); border-radius: 10px; padding: 10px 14px; font: inherit; cursor: pointer; transition: .15s; white-space: nowrap; }
+  .btn:hover { border-color: var(--accent); background: #262c36; }
+  .btn.primary { background: linear-gradient(135deg, var(--accent), var(--accent2)); border: none; color: #fff; font-weight: 600; }
+  .btn.danger { border-color: #5a2a2a; background: #2a1818; }
+  .btn.chaos { background: linear-gradient(135deg, #ff4d6d, #7c5cff); border: none; color: #fff; font-weight: 700; }
+  .checks { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-top: 6px; }
+  .checks label { display: inline-flex; align-items: center; gap: 6px; margin: 0; color: var(--text); font-size: .9rem; }
+  input[type="range"] { width: 100%; accent-color: var(--accent); }
+  .range-row { display: grid; grid-template-columns: 60px 1fr 44px; gap: 8px; align-items: center; }
+  .range-row span:last-child { text-align: right; color: var(--accent2); font-variant-numeric: tabular-nums; }
+  .note { font-size: .85rem; color: var(--muted); margin-top: 12px; }
+  .warn { border-left: 3px solid #f59e0b; padding-left: 12px; color: #fbbf24; font-size: .9rem; margin-top: 16px; }
+  .count { color: var(--muted); font-size: .85rem; margin-top: 6px; }
+
+  .density-row {
+    margin-top: 14px;
+    padding: 12px;
+    background: #0b0d11;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+  }
+  .density-row .range-row { grid-template-columns: 80px 1fr 56px; }
+  .density-row span:first-child { color: var(--accent2); font-weight: 600; }
+  .density-hint { font-size: .8rem; color: var(--muted); margin-top: 4px; }
+
+  #output {
+    margin-top: 8px;
+    padding: 180px 48px;
+    border-radius: 12px;
+    background: #0b0d11;
+    border: 1px solid var(--border);
+    min-height: 560px;
+    word-break: break-all;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+    font-size: 1.15rem;
+    line-height: 11.0;
+    letter-spacing: 0.7em;
+    overflow: visible;
+    font-family: "Segoe UI", "Microsoft YaHei", "Noto Sans SC", "PingFang SC", system-ui, -apple-system, sans-serif;
+    outline: none;
+    caret-color: var(--accent2);
+    transition: border-color .15s;
+    font-variant-ligatures: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+  }
+  #output:focus { border-color: var(--accent); }
+  #output:empty::before {
+    content: attr(data-placeholder);
+    color: var(--muted);
+    pointer-events: none;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>组合文字生成器</h1>
+  <div class="sub">阿拉伯语 + 希伯来语 + 拉丁语三层组合符号，三个滑条独立生效、互不干扰。</div>
+
+  <div class="grid">
+    <div class="card">
+      <label for="input">输入文字</label>
+      <textarea id="input" placeholder="在这里输入你想转换的文字">郭某某人哟</textarea>
+
+      <label>混乱档位</label>
+      <select id="preset">
+        <option value="light">轻度</option>
+        <option value="medium">中度</option>
+        <option value="heavy" selected>重度</option>
+        <option value="custom">自定义</option>
+      </select>
+
+      <label>每字层数上限</label>
+      <div class="range-row"><span>上方</span><input type="range" id="up" min="0" max="8" value="6"><span id="upVal">6</span></div>
+      <div class="range-row"><span>中间</span><input type="range" id="mid" min="0" max="6" value="4"><span id="midVal">4</span></div>
+      <div class="range-row"><span>下方</span><input type="range" id="down" min="0" max="8" value="6"><span id="downVal">6</span></div>
+
+      <div class="density-row">
+        <div class="range-row">
+          <span>疏密度</span>
+          <input type="range" id="density" min="0" max="100" value="100">
+          <span id="densityVal">100</span>
+        </div>
+        <div class="density-hint" id="densityHint">极密：每个字都接近上限，整体密集但无堆叠。</div>
+      </div>
+
+      <label>组合符号库</label>
+      <div class="checks" id="charsets">
+        <label><input type="checkbox" value="latin" checked> 拉丁组合</label>
+        <label><input type="checkbox" value="arabic" checked> 阿拉伯组合</label>
+        <label><input type="checkbox" value="hebrew" checked> 希伯来组合</label>
+        <label><input type="checkbox" value="combining_j" checked> j 字符堆叠</label>
+      </div>
+
+      <div class="row" style="margin-top:14px;">
+        <button class="btn primary" id="generate">换一批</button>
+        <button class="btn chaos" id="maxAll">一键全部最大</button>
+        <button class="btn" id="copy">复制结果</button>
+        <button class="btn danger" id="clear">清空</button>
+      </div>
+      <div class="count" id="count">字符数：0</div>
+    </div>
+
+    <div class="card">
+      <label>输出（可直接编辑、全选复制）</label>
+      <div id="output" contenteditable="plaintext-only" spellcheck="false"
+           data-placeholder="生成结果会出现在这里"></div>
+      <div class="note">
+        拖动上方滑条只改变上方符号，中间和下方不受影响。
+      </div>
+    </div>
+  </div>
+
+  <div class="warn">
+    请勿将本工具用于骚扰、威胁、跟踪或攻击他人。高混乱度文本可能被平台过滤或截断。
+  </div>
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  const LATIN = {
+    up: [
+      '\u0300','\u0301','\u0302','\u0303','\u0304','\u0305','\u0306','\u0307',
+      '\u0308','\u0309','\u030A','\u030B','\u030C','\u030D','\u030E','\u030F',
+      '\u0310','\u0311','\u0312','\u0313','\u0314','\u0315','\u033D','\u033E','\u033F'
+    ],
+    mid: ['\u0334','\u0335','\u0336','\u0337','\u0338'],
+    down: [
+      '\u0316','\u0317','\u0318','\u0319','\u031A','\u031B','\u031C','\u031D',
+      '\u031E','\u031F','\u0320','\u0321','\u0322','\u0323','\u0324','\u0325',
+      '\u0326','\u0327','\u0328','\u0329','\u032A','\u032B','\u032C','\u032D',
+      '\u032E','\u032F','\u0330','\u0331','\u0332','\u0333','\u0339','\u033A','\u033B','\u033C',
+      '\u035C','\u035D','\u035E','\u035F','\u0360','\u0361','\u0362',
+      '\u0359','\u035A','\u035B'
+    ]
+  };
+
+  const ARABIC = {
+    up: [
+      '\u064B','\u064C','\u064D','\u064E','\u064F','\u0650','\u0651','\u0652',
+      '\u0653','\u0654','\u0655','\u0656','\u0657','\u0658','\u0659','\u065A',
+      '\u065B','\u065C','\u065D','\u065E','\u065F','\u0670',
+      '\u06D6','\u06D7','\u06D8','\u06D9','\u06DA','\u06DB','\u06DC',
+      '\u06DF','\u06E0','\u06E1','\u06E2','\u06E3','\u06E4','\u06E7','\u06E8',
+      '\u06EA','\u06EB','\u06EC','\u06ED'
+    ],
+    mid: [],
+    down: [
+      '\u0655','\u0656','\u065C','\u065F','\u06E3','\u06EA','\u06EB','\u06EC','\u06ED'
+    ]
+  };
+
+  const HEBREW = {
+    up: [
+      '\u0591','\u0592','\u0593','\u0594','\u0595','\u0596','\u0597','\u0598',
+      '\u0599','\u059A','\u059B','\u059C','\u059D','\u059E','\u059F','\u05A0',
+      '\u05A1','\u05A2','\u05A3','\u05A4','\u05A5','\u05A6','\u05A7','\u05A8',
+      '\u05A9','\u05AA','\u05AB','\u05AC','\u05AD','\u05AE','\u05AF',
+      '\u05B0','\u05B1','\u05B2','\u05B3','\u05B4','\u05B5','\u05B6','\u05B7',
+      '\u05B8','\u05B9','\u05BA','\u05BB','\u05BC','\u05BD','\u05BF',
+      '\u05C1','\u05C2','\u05C4','\u05C5','\u05C7'
+    ],
+    mid: [],
+    down: [
+      '\u05B0','\u05B1','\u05B2','\u05B3','\u05B4','\u05B5','\u05B6','\u05B7',
+      '\u05B8','\u05B9','\u05BA','\u05BB','\u05BC','\u05BD','\u05BF',
+      '\u05C1','\u05C2','\u05C4','\u05C5','\u05C7'
+    ]
+  };
+
+  const J_LATIN = {
+    up: [
+      '\u0300','\u0301','\u0302','\u0303','\u0304','\u0305','\u0306','\u0307',
+      '\u0308','\u0309','\u030A','\u030B','\u030C','\u030D','\u030E','\u030F',
+      '\u0310','\u0311','\u0312','\u0313','\u0314','\u0315'
+    ],
+    mid: [],
+    down: [
+      '\u0316','\u0317','\u0318','\u0319','\u031A','\u031B','\u031C','\u031D',
+      '\u031E','\u031F','\u0320','\u0321','\u0322','\u0323','\u0324','\u0325',
+      '\u0326','\u0327','\u0328','\u0329','\u032A','\u032B','\u032C','\u032D',
+      '\u032E','\u032F','\u0330','\u0331','\u0332','\u0333','\u0339','\u033A','\u033B','\u033C',
+      '\u0345','\u0346','\u0347','\u0348','\u0349','\u034A','\u034B','\u034C'
+    ]
+  };
+
+  /* ============================================================
+   * 低权重符号：视觉上像“/”的斜线类
+   * 它们出现频率约为其他符号的 1/4
+   * ============================================================ */
+  const LOW_WEIGHT = new Set([
+    '\u0337', // 短斜线覆盖
+    '\u0338'  // 长斜线覆盖
+  ]);
+  const WEIGHT_LOW = 1;
+  const WEIGHT_DEFAULT = 4;
+
+  function symbolWeight(sym) {
+    return LOW_WEIGHT.has(sym) ? WEIGHT_LOW : WEIGHT_DEFAULT;
+  }
+
+  const PRESETS = {
+    light:  { up: 3, mid: 2, down: 3, density: 62,  sets:['latin','arabic','hebrew','combining_j'] },
+    medium: { up: 4, mid: 3, down: 4, density: 81,  sets:['latin','arabic','hebrew','combining_j'] },
+    heavy:  { up: 6, mid: 4, down: 6, density: 100, sets:['latin','arabic','hebrew','combining_j'] },
+    custom: null
+  };
+
+  function densityToBias(d) { return 4.0 - (d / 100) * 3.0; }
+  function densityHint(d) {
+    if (d < 19) return '极疏：只有少数字会叠加少量符号。';
+    if (d < 44) return '偏疏：大部分字叠加较少，少数密集。';
+    if (d < 69) return '偏高：大部分字都会获得叠加。';
+    if (d < 88) return '很密：几乎所有字都会获得叠加。';
+    return '极密：每个字都接近上限，整体密集但无堆叠。';
+  }
+
+  const $ = id => document.getElementById(id);
+  const input = $('input'), output = $('output');
+  const upRange = $('up'), midRange = $('mid'), downRange = $('down');
+  const upVal = $('upVal'), midVal = $('midVal'), downVal = $('downVal');
+  const densityRange = $('density'), densityVal = $('densityVal'), densityHintEl = $('densityHint');
+  const presetSel = $('preset');
+  const charsetsBox = $('charsets');
+  const countEl = $('count');
+
+  let currentSeed = (Date.now() & 0x7FFFFFFF) || 1;
+  function newSeed() { currentSeed = (Date.now() & 0x7FFFFFFF) || 1; }
+
+  function safeInt(el, fallback) {
+    const v = parseInt(el && el.value, 10);
+    return Number.isFinite(v) ? v : fallback;
+  }
+
+  function getSelectedSets() {
+    const checks = charsetsBox.querySelectorAll('input[type="checkbox"]');
+    const selected = [];
+    checks.forEach(c => { if (c.checked) selected.push(c.value); });
+    return selected.length ? selected : ['latin','arabic','hebrew','combining_j'];
+  }
+
+  function mergeCharsets(setNames) {
+    const up = [], mid = [], down = [];
+    setNames.forEach(name => {
+      let set;
+      if (name === 'latin') set = LATIN;
+      else if (name === 'arabic') set = ARABIC;
+      else if (name === 'hebrew') set = HEBREW;
+      else if (name === 'combining_j') set = J_LATIN;
+      if (!set) return;
+      if (set.up) up.push(...set.up);
+      if (set.mid) mid.push(...set.mid);
+      if (set.down) down.push(...set.down);
+    });
+    return {
+      up: [...new Set(up)],
+      mid: [...new Set(mid)],
+      down: [...new Set(down)]
+    };
+  }
+
+  function mulberry32(a) {
+    return function() {
+      let t = a += 0x6D2B79F5;
+      t = Math.imul(t ^ t >>> 15, t | 1);
+      t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+
+  /* ============================================================
+   * 加权不重复抽样
+   * 权重低的符号更难被选中
+   * ============================================================ */
+  function pickNoRepeat(pool, count, rand, lastSymbol) {
+    if (!pool.length || count <= 0) return { text: '', last: lastSymbol || null };
+    const result = [];
+    let remaining = pool.slice();
+    let last = lastSymbol || null;
+
+    for (let i = 0; i < count; i++) {
+      if (remaining.length === 0) {
+        remaining = pool.slice();
+        if (last && remaining.length > 1 && remaining[0] === last) {
+          const swapIdx = 1 + Math.floor(rand() * (remaining.length - 1));
+          [remaining[0], remaining[swapIdx]] = [remaining[swapIdx], remaining[0]];
+        }
+      }
+
+      // 加权选择
+      let totalW = 0;
+      for (let j = 0; j < remaining.length; j++) {
+        totalW += symbolWeight(remaining[j]);
+      }
+      let r = rand() * totalW;
+      let idx = 0;
+      for (let j = 0; j < remaining.length; j++) {
+        r -= symbolWeight(remaining[j]);
+        if (r <= 0) { idx = j; break; }
+      }
+
+      const sym = remaining[idx];
+      result.push(sym);
+      remaining.splice(idx, 1);
+      last = sym;
+    }
+    return { text: result.join(''), last };
+  }
+
+  function generateZalgo(text, opts) {
+    const { upMax, midMax, downMax, sets, seed, density, jSet } = opts;
+    const chars = Array.from(text);
+    const merged = mergeCharsets(sets);
+
+    const BIAS = densityToBias(density);
+
+    let result = '';
+
+    for (let i = 0; i < chars.length; i++) {
+      const ch = chars[i];
+      if (/\s/.test(ch)) { result += ch; continue; }
+      result += ch;
+
+      const baseSeed = (seed + i * 9973) >>> 0;
+      const rUp   = mulberry32((baseSeed ^ 0x1A2B3C4D) >>> 0);
+      const rMid  = mulberry32((baseSeed ^ 0x5E6F7A8B) >>> 0);
+      const rDown = mulberry32((baseSeed ^ 0x9C0D1E2F) >>> 0);
+      const rJ    = mulberry32((baseSeed ^ 0x3F4E5D6C) >>> 0);
+
+      const upN   = Math.floor(Math.pow(rUp(), BIAS) * upMax);
+      const midN  = Math.floor(Math.pow(rMid(), BIAS) * midMax);
+      const downN = Math.floor(Math.pow(rDown(), BIAS) * downMax);
+
+      result += pickNoRepeat(merged.up, upN, rUp, null).text;
+      result += pickNoRepeat(merged.mid, midN, rMid, null).text;
+      result += pickNoRepeat(merged.down, downN, rDown, null).text;
+
+      if (jSet && rJ() < 0.15) {
+        const jCount = 1;
+        for (let k = 0; k < jCount; k++) {
+          result += 'j';
+          const jUp = Math.floor(rJ() * 5) + 2;
+          const jDown = Math.floor(rJ() * 6) + 3;
+          const rJUp   = mulberry32((baseSeed + k * 131 + 101) >>> 0);
+          const rJDown = mulberry32((baseSeed + k * 131 + 202) >>> 0);
+          result += pickNoRepeat(J_LATIN.up, jUp, rJUp, null).text;
+          result += pickNoRepeat(J_LATIN.down, jDown, rJDown, null).text;
+        }
+      }
+    }
+    return result;
+  }
+
+  function updateOutput(regenerate) {
+    try {
+      const text = input.value;
+      densityHintEl.textContent = densityHint(safeInt(densityRange, 100));
+
+      if (!text) {
+        output.textContent = '';
+        countEl.textContent = '字符数：0';
+        return;
+      }
+
+      if (regenerate) newSeed();
+
+      const selectedSets = getSelectedSets();
+      const jSet = selectedSets.includes('combining_j');
+
+      const result = generateZalgo(text, {
+        upMax: safeInt(upRange, 6),
+        midMax: safeInt(midRange, 4),
+        downMax: safeInt(downRange, 6),
+        sets: selectedSets,
+        seed: currentSeed,
+        density: safeInt(densityRange, 100),
+        jSet: jSet
+      });
+
+      output.textContent = result;
+      countEl.textContent = '字符数：' + Array.from(result).length +
+        '（原文字符数：' + Array.from(text).length + '）';
+    } catch (err) {
+      console.error('生成失败：', err);
+      output.textContent = '生成失败：' + err.message;
+    }
+  }
+
+  function applyPreset(name, regenerate) {
+    const p = PRESETS[name];
+    if (!p) return;
+    upRange.value = p.up;
+    midRange.value = p.mid;
+    downRange.value = p.down;
+    densityRange.value = p.density;
+    upVal.textContent = p.up;
+    midVal.textContent = p.mid;
+    downVal.textContent = p.down;
+    densityVal.textContent = p.density;
+
+    const checks = charsetsBox.querySelectorAll('input[type="checkbox"]');
+    checks.forEach(c => { c.checked = p.sets.includes(c.value); });
+    updateOutput(regenerate !== false);
+  }
+
+  function copyText(text) {
+    if (navigator.clipboard && window.isSecureContext) {
+      return navigator.clipboard.writeText(text);
+    }
+    return new Promise((resolve, reject) => {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.left = '-9999px';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      try { document.execCommand('copy'); resolve(); }
+      catch (e) { reject(e); }
+      finally { document.body.removeChild(ta); }
+    });
+  }
+
+  upRange.addEventListener('input', () => { upVal.textContent = upRange.value; presetSel.value = 'custom'; updateOutput(false); });
+  midRange.addEventListener('input', () => { midVal.textContent = midRange.value; presetSel.value = 'custom'; updateOutput(false); });
+  downRange.addEventListener('input', () => { downVal.textContent = downRange.value; presetSel.value = 'custom'; updateOutput(false); });
+  densityRange.addEventListener('input', () => { densityVal.textContent = densityRange.value; presetSel.value = 'custom'; updateOutput(false); });
+  input.addEventListener('input', () => updateOutput(false));
+  charsetsBox.addEventListener('change', () => { presetSel.value = 'custom'; updateOutput(false); });
+  presetSel.addEventListener('change', () => applyPreset(presetSel.value, true));
+
+  $('generate').addEventListener('click', () => updateOutput(true));
+
+  $('maxAll').addEventListener('click', () => {
+    upRange.value = upRange.max;
+    midRange.value = midRange.max;
+    downRange.value = downRange.max;
+    densityRange.value = densityRange.max;
+    upVal.textContent = upRange.value;
+    midVal.textContent = midRange.value;
+    downVal.textContent = downRange.value;
+    densityVal.textContent = densityRange.value;
+
+    const checks = charsetsBox.querySelectorAll('input[type="checkbox"]');
+    checks.forEach(c => { c.checked = true; });
+
+    presetSel.value = 'custom';
+    updateOutput(true);
+  });
+
+  $('copy').addEventListener('click', async () => {
+    const text = output.textContent;
+    if (!text) return;
+    try {
+      await copyText(text);
+      $('copy').textContent = '已复制！';
+      setTimeout(() => $('copy').textContent = '复制结果', 1200);
+    } catch (e) {
+      $('copy').textContent = '复制失败';
+      setTimeout(() => $('copy').textContent = '复制结果', 1200);
+    }
+  });
+
+  $('clear').addEventListener('click', () => {
+    input.value = '';
+    output.textContent = '';
+    countEl.textContent = '字符数：0';
+  });
+
+  upRange.value = 6;
+  midRange.value = 4;
+  downRange.value = 6;
+  densityRange.value = 100;
+  upVal.textContent = '6';
+  midVal.textContent = '4';
+  downVal.textContent = '6';
+  densityVal.textContent = '100';
+
+  const initChecks = charsetsBox.querySelectorAll('input[type="checkbox"]');
+  initChecks.forEach(c => { c.checked = true; });
+
+  presetSel.value = 'heavy';
+
+  newSeed();
+  updateOutput(false);
+})();
+</script>
+</body>
+</html>
